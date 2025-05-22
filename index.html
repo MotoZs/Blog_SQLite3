@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8" />
+  <title>Blogok</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 2rem;
+      background-color: #f5f5f5;
+      color: #333;
+    }
+
+    h1 {
+      color: #0066cc;
+    }
+
+    .post {
+      background-color: white;
+      padding: 1rem;
+      margin: 1rem 0;
+      border-radius: 8px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+
+    .post h2 {
+      margin: 0;
+      color: #003366;
+    }
+
+    .post .meta {
+      font-size: 0.9em;
+      color: #666;
+    }
+
+    form {
+      background: white;
+      padding: 1rem;
+      border-radius: 8px;
+      margin-top: 2rem;
+    }
+
+    form input, form textarea, form select {
+      display: block;
+      width: 100%;
+      margin-bottom: 1rem;
+      padding: 0.5rem;
+      font-size: 1rem;
+    }
+
+    form button {
+      padding: 0.5rem 1rem;
+      background-color: #0066cc;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .actions button {
+      margin-right: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Blogbejegyzések</h1>
+  <div id="posts"></div>
+
+  <h2>Új bejegyzés létrehozása</h2>
+  <form id="postForm">
+    <input type="text" id="title" placeholder="Cím" required />
+    <select id="authorId" required></select>
+    <input type="text" id="category" placeholder="Kategória" required />
+    <textarea id="content" rows="5" placeholder="Tartalom" required></textarea>
+    <button type="submit">Mentés</button>
+  </form>
+
+  <script>
+    const postsContainer = document.getElementById('posts')
+    const form = document.getElementById('postForm')
+    const authorSelect = document.getElementById('authorId')
+
+    async function fetchUsers() {
+      const res = await fetch('/users')
+      const users = await res.json()
+      authorSelect.innerHTML = users.map(u => 
+        `<option value="${u.id}">${u.name}</option>`
+      ).join('')
+    }
+
+    async function fetchPosts() {
+      const res = await fetch('/posts')
+      const posts = await res.json()
+      postsContainer.innerHTML = posts.map(post => `
+        <div class="post">
+          <h2>${post.title}</h2>
+          <div class="meta">Szerző: ${post.authorName} • ${new Date(post.createdAt).toLocaleString()}</div>
+          <div><strong>Kategória:</strong> ${post.category}</div>
+          <p>${post.content}</p>
+          <div class="actions">
+            <button onclick="editPost(${post.id})">Szerkesztés</button>
+            <button onclick="deletePost(${post.id})">Törlés</button>
+          </div>
+        </div>
+      `).join('')
+    }
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault()
+      const title = document.getElementById('title').value
+      const authorId = document.getElementById('authorId').value
+      const category = document.getElementById('category').value
+      const content = document.getElementById('content').value
+
+      await fetch('/posts', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ title, authorId, category, content })
+      })
+
+      form.reset()
+      fetchPosts()
+    })
+
+    async function deletePost(id) {
+      if (!confirm('Biztosan törölni akarod?')) return
+      await fetch(`/posts/${id}`, { method: 'DELETE' })
+      fetchPosts()
+    }
+
+    async function editPost(id) {
+      const post = await fetch(`/posts/${id}`).then(res => res.json())
+      document.getElementById('title').value = post.title
+      document.getElementById('authorId').value = post.authorId
+      document.getElementById('category').value = post.category
+      document.getElementById('content').value = post.content
+
+      form.removeEventListener('submit', handleCreate)
+
+      form.onsubmit = async e => {
+        e.preventDefault()
+        const title = document.getElementById('title').value
+        const category = document.getElementById('category').value
+        const content = document.getElementById('content').value
+
+        await fetch(`/posts/${id}`, {
+          method: 'PUT',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ title, category, content })
+        })
+
+        form.reset()
+        form.onsubmit = handleCreate
+        fetchPosts()
+      }
+    }
+
+    async function handleCreate(e) {
+      e.preventDefault()
+      const title = document.getElementById('title').value
+      const authorId = document.getElementById('authorId').value
+      const category = document.getElementById('category').value
+      const content = document.getElementById('content').value
+
+      await fetch('/posts', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ title, authorId, category, content })
+      })
+
+      form.reset()
+      fetchPosts()
+    }
+
+    form.onsubmit = handleCreate
+
+    fetchUsers()
+    fetchPosts()
+  </script>
+</body>
+</html>
